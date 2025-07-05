@@ -1,0 +1,8 @@
+---
+- name: test connectivity
+  hosts: all
+  become: yes
+
+  tasks:
+  - name: Do a ping test
+    ping:
