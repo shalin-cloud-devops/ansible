@@ -1,0 +1,19 @@
+---
+- name: Copy the script and execute it on remote servers
+  hosts: webservers
+  become: yes
+
+  tasks:
+  - name: Copy the script
+    copy: #uses copy module
+      src: ./scripts/tomcat_install.sh
+      dest: /tmp/tomcat_install.sh
+      mode: 755
+  
+  - name: Execute the script
+    shell: # uses shell module
+      cmd: /tmp/tomcat_install.sh
+    args:
+      chdir: /tmp
+
+
