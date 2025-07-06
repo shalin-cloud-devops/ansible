@@ -1,0 +1,8 @@
+---
+stage_dir: /tmp/stage
+install_path: /opt/tomcat/webapps/
+tomcat_user: tomcat
+tomcat_group: tomcat
+war_download: https://tomcat.apache.org/tomcat-6.0-doc/appdev/sample/sample.war
+war_filename: sample.war
+app_name: sample

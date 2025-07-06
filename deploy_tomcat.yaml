@@ -1,0 +1,81 @@
+---
+- name: Download and Install war file to tomcat instance
+  hosts: webservers
+  become: yes
+  serial: 1
+
+  vars_files:
+    - vars.yaml
+
+  tasks:
+    - name: Stop Tomcat service
+      service:
+        name: tomcat # Assuming 'tomcat' is the service name. Adjust if different.
+        state: stopped
+
+    - name: Ensure Staging directory exists and has correct permissions
+      file:
+        path: "{{ stage_dir }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+
+    - name: check if any files present in staging directory
+      find:
+        paths: "{{ stage_dir }}"
+        file_type: any
+        hidden: true
+      register: files_to_delete
+
+    - name: Delete the files in staging
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ files_to_delete.files }}"
+      when: files_to_delete.files is defined and files_to_delete.files | length > 0
+
+    - name: Download the war file
+      get_url:
+        url: "{{ war_download }}"
+        dest: "{{ stage_dir }}/{{ war_filename }}"
+        mode: '0644'
+        owner: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+    
+    - name: Ensure target dir exists under webapps
+      file:
+        path: "{{ stage_dir }}/{{ app_name }}"
+        state: directory
+        mode: 750
+        owner: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+    
+    - name: Unarchive the war file into a named subdirectory in staging
+      unarchive:
+        src: "{{ stage_dir }}/{{ war_filename }}"
+        dest: "{{ stage_dir }}/{{ app_name }}" # <-- NEW DESTINATION: extract into /tmp/stage/sample/
+        remote_src: yes
+        owner: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+        mode: '0750' # Permissions for the created application subdirectory
+
+    - name: Copy the extracted application to webapps
+      copy:
+        src: "{{ stage_dir }}/{{ app_name }}" # Source is the named subdirectory created by unarchive
+        dest: "{{ install_path }}" # Destination is /opt/tomcat/webapps/
+        remote_src: yes # Still crucial, as source is on remote host
+        owner: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+        mode: '0750' # Permissions for the copied application directory (e.g., /opt/tomcat/webapps/sample)
+
+    - name: Cleanup staging
+      file:
+        path: "{{ stage_dir }}"
+        state: absent
+
+    - name: Start Tomcat service
+      service:
+        name: tomcat # Assuming 'tomcat' is the service name. Adjust if different.
+        state: started
+
