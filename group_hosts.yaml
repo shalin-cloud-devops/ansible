@@ -1,0 +1,23 @@
+all:
+  children:
+    web:
+      hosts:
+        web01:
+          ansible_host: 172.31.10.10
+          ansible_user: ec2-user
+          ansible_ssh_private_key_file: clientkey.pem
+        web02:
+          ansible_host: 172.31.0.178
+          ansible_user: ec2-user
+          ansible_ssh_private_key_file: clientkey.pem
+        web03:
+          ansible_host: 172.31.11.57
+          ansible_user: ec2-user
+          ansible_ssh_private_key_file: clientkey.pem
+                  
+    db:
+      hosts:
+        db01:
+          ansible_host: 172.31.5.132
+          ansible_user: ec2-user
+          ansible_ssh_private_key_file: clientkey.pem
