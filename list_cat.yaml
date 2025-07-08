@@ -1,0 +1,14 @@
+---
+- name: list and cat a file
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: List a directory
+      shell: cat /home/ec2-user/test*
+      register: cat_output
+    
+    - name: Print the file content
+      debug:
+        msg: "{{ cat_output.stdout }}"
+

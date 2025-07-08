@@ -1,0 +1,19 @@
+---
+- name: "Run adhoc commands"
+  hosts: all
+  become: yes
+    #serial: 1
+
+  tasks:
+
+    - name: "Check Dir space"
+      shell:
+        cmd: df -h
+      register: disk_output
+
+    - name: "Print Disk space"
+      debug:
+        msg: |
+          Disk space of {{ ansible_hostname }} - {{ inventory_hostname }} environment
+          {{ disk_output.stdout }}
+
