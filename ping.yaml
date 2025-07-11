@@ -1,62 +1,67 @@
 ---
-- name: Check if URLs return HTTP 200 (Clean Version)
+- name: Check if URLs return HTTP 200
   hosts: localhost
   gather_facts: false
   vars_files:
-    - hosts.yaml  # Load file with URLs (urls: [url1, url2, ...])
+    - hosts.yaml  # This should contain 'svc_urls' list
 
   vars:
-    delay_between_retries: 5    # Delay between retries (seconds)
-    max_retries: 3              # Number of retries per URL
+    delay_between_retries: 5
+    max_retries: 3
 
   tasks:
-    - name: Initialize result_list
+    - name: Check each URL
+      uri:
+        url: "{{ item }}"
+        method: GET
+        return_content: no
+        status_code: 200
+        timeout: 10
+      register: url_results
+      ignore_errors: yes  # Continue even if one URL fails
+      retries: "{{ max_retries }}"
+      delay: "{{ delay_between_retries }}"
+      loop: "{{ svc_urls }}"
+
+    - name: Process results
       set_fact:
-        result_list: []
+        success_count: "{{ (url_results.results | selectattr('status', '==', 200) | list | length) | int }}"
+        failed_count: "{{ (url_results.results | selectattr('status', '!=', 200) | list | length) | int }}"
+        failed_urls: |
+          {% set failed = [] %}
+          {% for result in url_results.results if result.status != 200 %}
+          {%   if failed.append(result.item ~ ' (status: ' ~ (result.status | default('unknown')) ~ ')') %}{% endif %}
+          {% endfor %}
+          {{ failed | join('\n') }}
 
-    - name: Loop through each URL and check status
-      block:
-        # Task 1: Perform HTTP check
-        - name: Perform HTTP check on URL
-          uri:
-            url: "{{ item }}"
-            method: GET
-            return_content: no
-            status_code: 200
-            timeout: 10
-          register: single_url_result
-          retries: "{{ max_retries }}"
-          delay: "{{ delay_between_retries }}"
-          until: single_url_result.status == 200
-          failed_when: single_url_result.status != 200
-          ignore_errors: yes
-
-        # Task 2: Save URL result (Success or Failed) to result_list
-        - name: Append result to result_list
-          set_fact:
-            result_list: "{{ result_list + [ { 'url': item, 'status': ( 'SUCCESS' if single_url_result.status == 200 else 'FAILED' ) } ] }}"
-
-        # Task 3: Print result for current URL
-        - name: Print result for URL
-          debug:
-            msg: >
-              URL: {{ item }} -
-              Status: {{ result_list[-1].status }} # Last item added
-      loop: "{{ urls }}"
-      loop_control:
-        label: "{{ item }}"
-
-    # Print all results at the end
-    - name: Print summary of all URL checks
+    - name: Show summary
       debug:
         msg: |
-          Health Check Summary:
-          {% for entry in result_list %}
-          - {{ entry.url }} : {{ entry.status }}
-          {% endfor %}
+          ========== URL HEALTH CHECK SUMMARY ==========
+          Total URLs checked: {{ svc_urls | length }}
+          ✅ Successful: {{ success_count }}
+          ❌ Failed: {{ failed_count }}
+          {% if failed_count | int > 0 %}
 
-    # Fail play if any URL failed
-    - name: Fail the play if any URL check failed
+          ===== FAILED URLS =====
+          {{ failed_urls }}
+          {% endif %}
+          ==============================================
+          Overall Status: {% if failed_count | int == 0 %}PASSED ✅{% else %}FAILED ❌{% endif %}
+
+    - name: Get and display hostname (if all URLs are up)
+      block:
+        - name: Get hostname
+          command: hostname
+          register: hostname_result
+          changed_when: false
+        
+        - name: Show hostname
+          debug:
+            msg: "Hostname where all checks passed: {{ hostname_result.stdout }}"
+      when: failed_count | int == 0
+
+    - name: Fail if any URL check failed
       fail:
-        msg: "One or more URLs failed the health check."
-      when: result_list | selectattr('status', 'equalto', 'FAILED') | list | length > 0
+        msg: "{{ failed_count }} URL(s) failed the health check. See details above."
+      when: failed_count | int > 0
