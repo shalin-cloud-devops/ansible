@@ -39,15 +39,15 @@
         msg: |
           ========== URL HEALTH CHECK SUMMARY ==========
           Total URLs checked: {{ svc_urls | length }}
-          ✅ Successful: {{ success_count }}
-          ❌ Failed: {{ failed_count }}
+          Successful: {{ success_count }}
+          Failed: {{ failed_count }}
           {% if failed_count | int > 0 %}
 
           ===== FAILED URLS =====
           {{ failed_urls }}
           {% endif %}
           ==============================================
-          Overall Status: {% if failed_count | int == 0 %}PASSED ✅{% else %}FAILED ❌{% endif %}
+          Overall Status: {% if failed_count | int == 0 %}PASSED {% else %}FAILED {% endif %}
 
     - name: Get and display hostname (if all URLs are up)
       block:
