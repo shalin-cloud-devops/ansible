@@ -1,0 +1,48 @@
+---
+- name: Simple URL Status Check
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - hosts.yaml
+
+  vars:
+    delay_between_retries: 5
+    max_retries: 3
+
+  tasks:
+    - name: Check each URL
+      uri:
+        url: "{{ item }}"
+        method: GET
+        return_content: no
+        status_code: 200
+        timeout: 10
+      register: url_results
+      ignore_errors: yes
+      retries: "{{ max_retries }}"
+      delay: "{{ delay_between_retries }}"
+      loop: "{{ svc_urls }}"
+
+    - name: Show simple results
+      debug:
+        msg: |
+          === URL Check Results ===
+          {% for result in url_results.results %}
+          - {{ result.item }}: {% if result.status == 200 %} PASSED{% else %} FAILED (status: {{ result.status | default('unknown') }}){% endif %}
+          {% endfor %}
+
+    - name: Show hostname if all passed
+      command: hostname
+      register: hostname_result
+      changed_when: false
+      when: url_results.results | selectattr('status', '!=', 200) | list | count == 0
+
+    - name: Display success message
+      debug:
+        msg: "All URLs working on host: {{ hostname_result.stdout }}"
+      when: hostname_result is defined
+
+    - name: Fail if any URLs failed
+      fail:
+        msg: "Some URLs failed - check the results above"
+      when: url_results.results | selectattr('status', '!=', 200) | list | count > 0
